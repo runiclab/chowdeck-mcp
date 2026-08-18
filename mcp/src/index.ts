@@ -15,14 +15,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import * as api from "./api.js";
-import { session, clearSession } from "./session.js";
+import { session, clearSession, snapshot } from "./session.js";
 
 const server = new McpServer({ name: "chowdeck", version: "0.6.1" });
 
 // ── Result helpers ──────────────────────────────────────────────────────────
 
-function res(data: unknown): { content: { type: "text"; text: string }[]; structuredContent?: any } {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+function res(data: unknown): { content: { type: "text"; text: string }[]; structuredContent?: any; _meta: Record<string, unknown> } {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+    // MCP metadata is available to the client but is not part of the model's
+    // visible tool text. Manu uses it to persist the updated session state.
+    _meta: { "manu/session_state": Buffer.from(JSON.stringify(snapshot()), "utf8").toString("base64") },
+  };
 }
 
 /**
@@ -245,14 +250,24 @@ server.registerTool(
   {
     description: "Search vendors and meals near the current address, with optional filters.",
     inputSchema: {
-      q: z.string(),
+      // The published server documented `q`, while one released runtime
+      // expected `query`. Accept both so clients do not need to know which
+      // Chowdeck MCP build they are connected to.
+      q: z.string().optional(),
+      query: z.string().optional(),
       sort: z.enum(["rating", "delivery_time", "distance"]).optional(),
       open_now: z.boolean().optional(),
       min_rating: z.number().min(0).max(5).optional(),
     },
     annotations: READ,
   },
-  async ({ q, ...filters }) => run(() => api.searchVendors(q, filters), { slim: true }),
+  async ({ q, query, ...filters }) => {
+    const searchQuery = q ?? query;
+    if (!searchQuery?.trim()) {
+      return res({ error: "Search query is required in q or query." },);
+    }
+    return run(() => api.searchVendors(searchQuery, filters), { slim: true });
+  },
 );
 
 server.registerTool(

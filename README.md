@@ -109,8 +109,11 @@ use low; `get_session` / `get_setup_status` return structured output.
 **Prompts:** `order_food`, `find_food_near_me`, `track_my_order`,
 `reorder_my_usual`.
 
-Sessions persist to `~/.chowdeck-mcp/session.json` (written `0600`), so the
-one-time login and address setup survive restarts.
+The server keeps session state in memory. Hosts such as Manu can provide an
+initial state through `CHOWDECK_SESSION_STATE_B64`. The current state is
+returned in MCP result metadata under `manu/session_state`, allowing the host
+to persist it in its own encrypted store without exposing it in model-visible
+tool text.
 
 ---
 
@@ -238,4 +241,3 @@ distribute (including commercially); just keep the copyright and license notice.
 
 Built and maintained by **[Hendrix Nwaokolo (@thathman)](https://github.com/thathman)**
 / [Airix Media](https://airixmedia.com). A credit or ⭐ is always appreciated.
-
