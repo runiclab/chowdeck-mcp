@@ -9,6 +9,11 @@
   "scripts": {
     "prepare": "npm --prefix mcp ci && npm --prefix mcp run build"
   },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.7.0",
+    "zod": "^4.4.3"
+  },
   "engines": {
     "node": ">=18"
   }
