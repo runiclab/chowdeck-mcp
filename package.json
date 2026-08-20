@@ -1,0 +1,15 @@
+{
+  "name": "@runiclab/chowdeck-mcp",
+  "version": "0.6.1",
+  "description": "Runic Lab's Chowdeck MCP server.",
+  "type": "module",
+  "bin": {
+    "chowdeck-mcp": "mcp/dist/index.js"
+  },
+  "scripts": {
+    "prepare": "npm --prefix mcp ci && npm --prefix mcp run build"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
