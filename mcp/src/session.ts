@@ -4,7 +4,7 @@
  * License: MIT. © 2026 Hendrix Nwaokolo.
  * Watermark: THATHMAN·CHOWDECK·MCP
  */
-// Session state lives in memory for one MCP process. Manu supplies the initial
+// Session state lives in memory for one MCP process. Muna supplies the initial
 // state through CHOWDECK_SESSION_STATE_B64 and receives updated state through
 // MCP result metadata, so this server never writes credentials to disk.
 
@@ -42,7 +42,7 @@ function loadInitialState(): SessionState {
 }
 
 // Proxy keeps the existing simple assignment style while making every update
-// available to snapshot(), which Manu reads from MCP result metadata.
+// available to snapshot(), which Muna reads from MCP result metadata.
 export const session: SessionState = new Proxy(loadInitialState(), {
 	set(target, prop, value) {
 		(target as any)[prop] = value;

@@ -25,8 +25,8 @@ function res(data: unknown): { content: { type: "text"; text: string }[]; struct
   return {
     content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
     // MCP metadata is available to the client but is not part of the model's
-    // visible tool text. Manu uses it to persist the updated session state.
-    _meta: { "manu/session_state": Buffer.from(JSON.stringify(snapshot()), "utf8").toString("base64") },
+    // visible tool text. Muna uses it to persist the updated session state.
+    _meta: { "muna/session_state": Buffer.from(JSON.stringify(snapshot()), "utf8").toString("base64") },
   };
 }
 

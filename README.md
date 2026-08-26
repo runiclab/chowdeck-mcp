@@ -109,9 +109,9 @@ use low; `get_session` / `get_setup_status` return structured output.
 **Prompts:** `order_food`, `find_food_near_me`, `track_my_order`,
 `reorder_my_usual`.
 
-The server keeps session state in memory. Hosts such as Manu can provide an
+The server keeps session state in memory. Hosts such as Muna can provide an
 initial state through `CHOWDECK_SESSION_STATE_B64`. The current state is
-returned in MCP result metadata under `manu/session_state`, allowing the host
+returned in MCP result metadata under `muna/session_state`, allowing the host
 to persist it in its own encrypted store without exposing it in model-visible
 tool text.
 
