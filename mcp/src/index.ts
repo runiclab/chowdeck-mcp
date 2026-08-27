@@ -253,7 +253,7 @@ server.registerTool(
       // `q` is the canonical search field. Keep `query` as a compatibility
       // alias for older clients, but require the canonical field in the
       // advertised schema so models cannot accidentally call search with {}.
-      q: z.string(),
+      q: z.string().trim().min(1).describe("Restaurant or meal search text; must not be empty."),
       query: z.string().optional(),
       sort: z.enum(["rating", "delivery_time", "distance"]).optional(),
       open_now: z.boolean().optional(),
