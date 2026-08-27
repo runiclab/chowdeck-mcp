@@ -180,7 +180,7 @@ export async function searchVendors(
 ) {
   if (!session.addressId) throw new Error("No address set. Call set_address first.");
   return (await client().get("/customer/search", {
-    params: { q, address_id: session.addressId, ...filters },
+    params: { query: q, address_id: session.addressId, ...filters },
   })).data;
 }
 

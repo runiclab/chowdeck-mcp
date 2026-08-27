@@ -17,7 +17,7 @@ import { z } from "zod";
 import * as api from "./api.js";
 import { session, clearSession, snapshot } from "./session.js";
 
-const server = new McpServer({ name: "chowdeck", version: "0.6.2" });
+const server = new McpServer({ name: "chowdeck", version: "0.6.3" });
 
 // ── Result helpers ──────────────────────────────────────────────────────────
 
@@ -258,7 +258,6 @@ server.registerTool(
     annotations: READ,
   },
   async ({ q, ...filters }) => {
-    console.error(`[chowdeck] search received q_present=${Boolean(q)} q_len=${q?.length ?? 0}`);
     return run(() => api.searchVendors(q, filters), { slim: true });
   },
 );

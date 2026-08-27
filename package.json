@@ -1,6 +1,6 @@
 {
   "name": "@runiclab/chowdeck-mcp",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Runic Lab's Chowdeck MCP server.",
   "type": "module",
   "bin": {
