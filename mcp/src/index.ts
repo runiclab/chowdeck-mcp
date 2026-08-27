@@ -250,23 +250,15 @@ server.registerTool(
   {
     description: "Search vendors and meals near the current address, with optional filters.",
     inputSchema: {
-      // Accept both names because some MCP clients/cache layers still use the
-      // older `query` field. The handler validates that one is non-empty.
-      q: z.string().trim().optional().describe("Restaurant or meal search text."),
-      query: z.string().optional(),
+      q: z.string().trim().min(1).describe("Restaurant or meal search text; must not be empty."),
       sort: z.enum(["rating", "delivery_time", "distance"]).optional(),
       open_now: z.boolean().optional(),
       min_rating: z.number().min(0).max(5).optional(),
     },
     annotations: READ,
   },
-  async (args) => {
-    const { q, query, ...filters } = args;
-    const searchQuery = q?.trim() || query?.trim();
-    if (!searchQuery?.trim()) {
-      return res({ error: "Search query is required in q or query." },);
-    }
-    return run(() => api.searchVendors(searchQuery, filters), { slim: true });
+  async ({ q, ...filters }) => {
+    return run(() => api.searchVendors(q, filters), { slim: true });
   },
 );
 
