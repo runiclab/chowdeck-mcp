@@ -250,10 +250,10 @@ server.registerTool(
   {
     description: "Search vendors and meals near the current address, with optional filters.",
     inputSchema: {
-      // The published server documented `q`, while one released runtime
-      // expected `query`. Accept both so clients do not need to know which
-      // Chowdeck MCP build they are connected to.
-      q: z.string().optional(),
+      // `q` is the canonical search field. Keep `query` as a compatibility
+      // alias for older clients, but require the canonical field in the
+      // advertised schema so models cannot accidentally call search with {}.
+      q: z.string(),
       query: z.string().optional(),
       sort: z.enum(["rating", "delivery_time", "distance"]).optional(),
       open_now: z.boolean().optional(),
