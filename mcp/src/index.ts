@@ -250,10 +250,9 @@ server.registerTool(
   {
     description: "Search vendors and meals near the current address, with optional filters.",
     inputSchema: {
-      // `q` is the canonical search field. Keep `query` as a compatibility
-      // alias for older clients, but require the canonical field in the
-      // advertised schema so models cannot accidentally call search with {}.
-      q: z.string().trim().min(1).describe("Restaurant or meal search text; must not be empty."),
+      // Accept both names because some MCP clients/cache layers still use the
+      // older `query` field. The handler validates that one is non-empty.
+      q: z.string().trim().optional().describe("Restaurant or meal search text."),
       query: z.string().optional(),
       sort: z.enum(["rating", "delivery_time", "distance"]).optional(),
       open_now: z.boolean().optional(),
@@ -261,8 +260,9 @@ server.registerTool(
     },
     annotations: READ,
   },
-  async ({ q, query, ...filters }) => {
-    const searchQuery = q ?? query;
+  async (args) => {
+    const { q, query, ...filters } = args;
+    const searchQuery = q?.trim() || query?.trim();
     if (!searchQuery?.trim()) {
       return res({ error: "Search query is required in q or query." },);
     }
