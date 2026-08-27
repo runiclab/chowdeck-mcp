@@ -258,6 +258,7 @@ server.registerTool(
     annotations: READ,
   },
   async ({ q, ...filters }) => {
+    console.error(`[chowdeck] search received q_present=${Boolean(q)} q_len=${q?.length ?? 0}`);
     return run(() => api.searchVendors(q, filters), { slim: true });
   },
 );
