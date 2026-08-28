@@ -11,13 +11,40 @@
  * │  © 2026 Hendrix Nwaokolo.  Unofficial; not affiliated with Chowdeck.        │
  * └──────────────────────────────────────────────────────────────────────────┘
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool, type ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import * as api from "./api.js";
-import { session, clearSession, snapshot } from "./session.js";
+import { session, clearSession, snapshot, withSessionMetadata } from "./session.js";
 
 const server = new McpServer({ name: "chowdeck", version: "0.6.3" });
+
+// Keep one MCP process shared across hosts while giving each tool invocation
+// its own session. The session metadata is supplied by Muna and is never part
+// of the model-visible tool arguments.
+function registerTool<
+	OutputArgs extends ZodRawShapeCompat | AnySchema,
+	InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined,
+>(
+	name: string,
+	config: {
+		title?: string;
+		description?: string;
+		inputSchema?: InputArgs;
+		outputSchema?: OutputArgs;
+		annotations?: ToolAnnotations;
+		_meta?: Record<string, unknown>;
+	},
+	handler: ToolCallback<InputArgs>,
+): RegisteredTool;
+function registerTool(name: string, config: any, handler: any) {
+	return server.registerTool(name, config, (...args: any[]) => {
+		const extra = args.length > 1 ? args[1] : args[0];
+		return withSessionMetadata(extra?._meta, () => handler(...args));
+	});
+}
 
 // ── Result helpers ──────────────────────────────────────────────────────────
 
@@ -92,7 +119,7 @@ const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, openWorldHint:
 
 // ── Session / address ─────────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "set_address",
   {
     description: "Create a delivery address (works as guest). Stores the address id for later calls.",
@@ -112,7 +139,7 @@ server.registerTool(
   async (args) => run(() => api.createAddress(args)),
 );
 
-server.registerTool(
+registerTool(
   "get_session",
   {
     description: "Show current session state. Call this FIRST: if setup_complete is false, run the first-time setup flow (login + address).",
@@ -140,7 +167,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "logout",
   {
     description: "Clear the saved session (token, address, guest id) from disk. Requires confirm:true.",
@@ -156,7 +183,7 @@ server.registerTool(
 
 // ── Location / geocoding ───────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "search_places",
   {
     description: "Search delivery addresses by text (Chowdeck place autocomplete). Returns predictions with place_id and description. Show these to the user and let THEM pick the correct one.",
@@ -166,7 +193,7 @@ server.registerTool(
   async ({ input }) => run(() => api.searchPlaces(input)),
 );
 
-server.registerTool(
+registerTool(
   "place_details",
   {
     description: "Get the exact coordinates and formatted address for a place_id from search_places.",
@@ -176,7 +203,7 @@ server.registerTool(
   async ({ place_id }) => run(() => api.placeDetails(place_id)),
 );
 
-server.registerTool(
+registerTool(
   "reverse_geocode",
   {
     description: "Turn precise device coordinates (lat/lng) into address candidates. Needs CHOWDECK_MAPS_KEY. Use when the host can provide the user's current GPS location.",
@@ -186,7 +213,7 @@ server.registerTool(
   async ({ latitude, longitude }) => run(() => api.reverseGeocode(latitude, longitude)),
 );
 
-server.registerTool(
+registerTool(
   "suggest_current_location",
   {
     description: "Rough current city from IP — SUGGESTION ONLY, not delivery-accurate. Use it to seed a search_places query, then have the user confirm the precise address.",
@@ -196,7 +223,7 @@ server.registerTool(
   async () => run(() => api.ipLocation()),
 );
 
-server.registerTool(
+registerTool(
   "set_address_from_place",
   {
     description: "Resolve a place_id to exact coordinates and save it as the delivery address. Preferred over set_address — guarantees real coordinates for delivery.",
@@ -208,13 +235,13 @@ server.registerTool(
 
 // ── Discovery ─────────────────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "get_config",
   { description: "Fetch storefront config (verticals, currencies, feature flags).", inputSchema: {}, annotations: READ },
   async () => run(() => api.getConfig(), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "list_vendors",
   {
     description: "List vendors (restaurants, shops, pharmacies...) near the current address, with optional filters.",
@@ -235,7 +262,7 @@ server.registerTool(
   async (args) => run(() => api.getVendors(args), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "featured_vendors",
   {
     description: "List featured/handpicked/explore vendors near the current address.",
@@ -245,7 +272,7 @@ server.registerTool(
   async ({ tag }) => run(() => api.getFeaturedVendors(tag), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "search",
   {
     description: "Search vendors and meals near the current address, with optional filters.",
@@ -262,13 +289,13 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "get_menu_categories",
   { description: "List menu categories for a vendor.", inputSchema: { vendor_id: z.number() }, annotations: READ },
   async ({ vendor_id }) => run(() => api.getMenuCategories(vendor_id), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "get_menu",
   {
     description: "List a vendor's menu. Optionally filter by category name (e.g. 'Small Chops', 'Rice') to avoid truncation on large menus.",
@@ -281,7 +308,7 @@ server.registerTool(
   async ({ vendor_id, category }) => run(() => api.getMenu(vendor_id, category), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "get_menu_item",
   {
     description: "Get full details for one menu item (options, add-ons, price).",
@@ -293,19 +320,19 @@ server.registerTool(
 
 // ── Favourites ──────────────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "list_favorites",
   { description: "List the user's saved/favourite vendors (requires login).", inputSchema: {}, annotations: READ },
   async () => run(() => api.listFavorites(), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "add_favorite",
   { description: "Save a vendor to the user's favourites (requires login).", inputSchema: { vendor_id: z.number() }, annotations: WRITE },
   async ({ vendor_id }) => run(() => api.addFavorite(vendor_id)),
 );
 
-server.registerTool(
+registerTool(
   "remove_favorite",
   { description: "Remove a vendor from the user's favourites (requires login).", inputSchema: { vendor_id: z.number() }, annotations: WRITE },
   async ({ vendor_id }) => run(() => api.removeFavorite(vendor_id)),
@@ -313,7 +340,7 @@ server.registerTool(
 
 // ── Cart ──────────────────────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "reorder",
   {
     description: "Rebuild a cart from a past order so the user can place it again. Pass a past order_id (from get_order_history). Returns the new cart; confirm and checkout as usual.",
@@ -323,11 +350,11 @@ server.registerTool(
   async ({ order_id }) => run(() => api.reorder(order_id)),
 );
 
-server.registerTool("get_carts", { description: "List all carts for the current session.", inputSchema: {}, annotations: READ }, async () =>
+registerTool("get_carts", { description: "List all carts for the current session.", inputSchema: {}, annotations: READ }, async () =>
   run(() => api.getCarts(), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "clear_carts",
   { description: "Delete ALL carts for the current session. Requires confirm:true.", inputSchema: { ...CONFIRM }, annotations: DESTRUCTIVE },
   async ({ confirm }) => {
@@ -336,7 +363,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "delete_cart",
   { description: "Delete one cart by id. Requires confirm:true.", inputSchema: { cart_id: z.number(), ...CONFIRM }, annotations: DESTRUCTIVE },
   async ({ cart_id, confirm }) => {
@@ -345,13 +372,13 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "get_vendor_cart",
   { description: "Get the cart for one vendor.", inputSchema: { vendor_id: z.number() }, annotations: READ },
   async ({ vendor_id }) => run(() => api.getCartByVendor(vendor_id), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "update_cart",
   {
     description: "Create or update a cart with items for a vendor. Works as guest after set_address. Use pack_reference to group items into separate packs within one cart.",
@@ -374,7 +401,7 @@ server.registerTool(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "login_send_otp",
   {
     description: "Start phone login: validates the phone and sends an OTP via SMS/WhatsApp.",
@@ -388,7 +415,7 @@ server.registerTool(
     }),
 );
 
-server.registerTool(
+registerTool(
   "login_verify_otp",
   {
     description: "Complete login with the OTP the user received. Stores the bearer token in session.",
@@ -403,13 +430,13 @@ server.registerTool(
     }),
 );
 
-server.registerTool("get_me", { description: "Get the authenticated user's profile.", inputSchema: {}, annotations: READ }, async () =>
+registerTool("get_me", { description: "Get the authenticated user's profile.", inputSchema: {}, annotations: READ }, async () =>
   run(() => api.getMe(), { slim: true }),
 );
 
 // ── Account / setup ─────────────────────────────────────────────────────────────
 
-server.registerTool(
+registerTool(
   "get_setup_status",
   {
     description:
@@ -470,11 +497,11 @@ server.registerTool(
   },
 );
 
-server.registerTool("list_addresses", { description: "List the user's saved addresses (requires login).", inputSchema: {}, annotations: READ }, async () =>
+registerTool("list_addresses", { description: "List the user's saved addresses (requires login).", inputSchema: {}, annotations: READ }, async () =>
   run(() => api.listAddresses(), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "get_active_address",
   {
     description: "Get the account's active/last-used address — the default delivery target. Confirm it with the user before ordering.",
@@ -484,7 +511,7 @@ server.registerTool(
   async () => run(() => api.getActiveAddress()),
 );
 
-server.registerTool(
+registerTool(
   "use_address",
   {
     description: "Select a saved address as the active delivery address for this session (sets session.addressId and marks it active on Chowdeck). Use for returning users instead of creating a new address.",
@@ -499,17 +526,17 @@ server.registerTool(
     }),
 );
 
-server.registerTool("get_wallet", { description: "Get the user's wallet balance (requires login).", inputSchema: {}, annotations: READ }, async () =>
+registerTool("get_wallet", { description: "Get the user's wallet balance (requires login).", inputSchema: {}, annotations: READ }, async () =>
   run(() => api.getWallet()),
 );
 
-server.registerTool(
+registerTool(
   "get_order_history",
   { description: "List past orders (requires login). Optional status filter, e.g. 'completed'.", inputSchema: { status: z.string().optional() }, annotations: READ },
   async ({ status }) => run(() => api.getOrderHistory(status), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "set_payment_pref",
   {
     description: "Save the user's payment preference. mode 'default' = auto-use the chosen saved method (still confirm total); mode 'ask' = pick a method every order.",
@@ -524,19 +551,19 @@ server.registerTool(
 
 // ── Orders / checkout ─────────────────────────────────────────────────────────
 
-server.registerTool("get_active_orders", { description: "List the user's active orders (requires login).", inputSchema: {}, annotations: READ }, async () =>
+registerTool("get_active_orders", { description: "List the user's active orders (requires login).", inputSchema: {}, annotations: READ }, async () =>
   run(() => api.getActiveOrders(), { slim: true }),
 );
 
-server.registerTool("get_order", { description: "Get one order by id.", inputSchema: { order_id: z.string() }, annotations: READ }, async ({ order_id }) =>
+registerTool("get_order", { description: "Get one order by id.", inputSchema: { order_id: z.string() }, annotations: READ }, async ({ order_id }) =>
   run(() => api.getOrder(order_id), { slim: true }),
 );
 
-server.registerTool("get_payment_methods", { description: "List saved payment methods (requires login).", inputSchema: {}, annotations: READ }, async () =>
+registerTool("get_payment_methods", { description: "List saved payment methods (requires login).", inputSchema: {}, annotations: READ }, async () =>
   run(() => api.getPaymentMethods()),
 );
 
-server.registerTool(
+registerTool(
   "get_delivery_fee",
   {
     description: "Quote the delivery fee for a vendor to the current address. Pass cart_id from the cart. Returns a fee object whose id is the fee_id needed for place_order.",
@@ -546,7 +573,7 @@ server.registerTool(
   async (args) => run(() => api.getDeliveryFee(args)),
 );
 
-server.registerTool(
+registerTool(
   "place_order",
   {
     description:
@@ -578,7 +605,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "track_order",
   {
     description: "Compact live status of an order: status, ETA, delivery PIN, rider name/phone, payment status, and tracking link. Poll this to follow a delivery.",
@@ -588,7 +615,7 @@ server.registerTool(
   async ({ order_id }) => run(() => api.trackOrder(order_id)),
 );
 
-server.registerTool(
+registerTool(
   "cancel_order",
   {
     description: "Cancel a placed, not-yet-fulfilled order. DESTRUCTIVE — requires confirm:true after the user agrees; any refund goes to the Chowdeck wallet.",
@@ -601,7 +628,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "tip_rider",
   {
     description: "Tip the rider for an order. DESTRUCTIVE — moves money; requires confirm:true after the user approves. Amount is in KOBO (50000 = ₦500), paid from the Chowdeck wallet by default. (Note: place_order's rider_tip is in naira; this endpoint uses kobo.)",
@@ -619,7 +646,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "get_notifications",
   {
     description: "Fetch the user's notifications (order updates, promos). Requires login.",
@@ -629,7 +656,7 @@ server.registerTool(
   async () => run(() => api.getNotifications(), { slim: true }),
 );
 
-server.registerTool(
+registerTool(
   "validate_promo",
   {
     description: "Check a promo / voucher code (optionally for a vendor or cart). If valid, pass it to place_order via promo_codes. Best-effort endpoint.",
@@ -639,7 +666,7 @@ server.registerTool(
   async ({ code, vendor_id, cart_id }) => run(() => api.validatePromo(code, { vendor_id, cart_id })),
 );
 
-server.registerTool(
+registerTool(
   "wallet_topup",
   {
     description: "Initialise a wallet top-up — returns a Paystack link the user completes to add money. DESTRUCTIVE (moves money); requires confirm:true after the user approves the amount. Best-effort endpoint.",
@@ -652,7 +679,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   "get_payment_channels",
   {
     description: "List available payment channels (card, bank_transfer, ussd, opay...). Each name is a valid `method` for start_order_payment.",
@@ -662,7 +689,7 @@ server.registerTool(
   async () => run(() => api.getPaymentChannels()),
 );
 
-server.registerTool(
+registerTool(
   "start_order_payment",
   {
     description:
@@ -673,7 +700,7 @@ server.registerTool(
   async ({ order_id, method, callback_url }) => run(() => api.startOrderPayment(order_id, method, callback_url)),
 );
 
-server.registerTool(
+registerTool(
   "verify_payment",
   { description: "Verify a payment transaction status.", inputSchema: { transaction_id: z.string() }, annotations: READ },
   async ({ transaction_id }) => run(() => api.verifyPayment(transaction_id)),
