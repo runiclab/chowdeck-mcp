@@ -5,12 +5,17 @@
  * Watermark: THATHMAN·CHOWDECK·MCP
  */
 import axios, { type AxiosInstance, type AxiosRequestConfig } from "axios";
-import { session } from "./session.js";
+import { clearSession, session } from "./session.js";
 
 const BASE = process.env.CHOWDECK_API_BASE ?? "https://api.chowdeck.com";
 const APP_VERSION = process.env.CHOWDECK_APP_VERSION ?? "2.0.0";
 const TIMEOUT_MS = Number(process.env.CHOWDECK_TIMEOUT_MS ?? 15000);
 const MAX_RETRIES = Number(process.env.CHOWDECK_MAX_RETRIES ?? 2);
+const AUTH_ERROR = "Chowdeck session is not authenticated or has been revoked. Reconnect Chowdeck before trying again.";
+
+function requireAuthenticated() {
+  if (!session.token) throw new Error(AUTH_ERROR);
+}
 
 function client(): AxiosInstance {
   const headers: Record<string, string> = {
@@ -28,6 +33,10 @@ function client(): AxiosInstance {
     const cfg = error.config as (AxiosRequestConfig & { _retry?: number; _noRetry?: boolean }) | undefined;
     if (!cfg || cfg._noRetry) throw error;
     const status = error.response?.status;
+    if (status === 401) {
+      clearSession();
+      throw new Error(AUTH_ERROR);
+    }
     const transient = status === undefined || status >= 500;
     cfg._retry = (cfg._retry ?? 0) + 1;
     if (!transient || cfg._retry > MAX_RETRIES) throw error;
@@ -220,6 +229,7 @@ export async function reorder(orderId: string) {
 // ── Cart ──────────────────────────────────────────────────────────────────────
 
 export async function getCarts() {
+  requireAuthenticated();
   return (await client().get("/customer/cart")).data;
 }
 
